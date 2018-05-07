@@ -54,7 +54,7 @@ parser.add_argument('--new_length', default=1, type=int,
                     metavar='N', help='length of sampled video frames (default: 1)')
 parser.add_argument('--new_width', default=340, type=int,
                     metavar='N', help='resize width (default: 340)')
-parser.add_argument('--new_height', default=256, type=int,
+parser.add_argument('--new_height', default=299, type=int,
                     metavar='N', help='resize height (default: 256)')
 parser.add_argument('--lr', '--learning-rate', default=0.001, type=float,
                     metavar='LR', help='initial learning rate')
@@ -128,7 +128,7 @@ def main():
         is_color = True
         scale_ratios = [1.0, 0.875, 0.75, 0.66]
         clip_mean = [0.485, 0.456, 0.406] * args.new_length
-        clip_std = [0.229, 0.224, 0.225] * args.new_length
+        clip_std = [0.299, 0.224, 0.225] * args.new_length
     elif args.modality == "flow":
         is_color = False
         scale_ratios = [1.0, 0.875, 0.75]
@@ -137,11 +137,13 @@ def main():
     else:
         print("No such modality. Only rgb and flow supported.")
 
+    new_size= 299 if args.arch =='rgb_inception_v3' else 224
+
     normalize = video_transforms.Normalize(mean=clip_mean,
                                            std=clip_std)
     train_transform = video_transforms.Compose([
             #video_transforms.Scale((256)),
-            video_transforms.MultiScaleCrop((224, 224), scale_ratios),
+            video_transforms.MultiScaleCrop((new_size, new_size), scale_ratios),
             video_transforms.RandomHorizontalFlip(),
             video_transforms.ToTensor(),
             normalize,
@@ -149,7 +151,7 @@ def main():
 
     val_transform = video_transforms.Compose([
             # video_transforms.Scale((256)),
-            video_transforms.CenterCrop((224)),
+            video_transforms.CenterCrop((new_size)),
             video_transforms.ToTensor(),
             normalize,
         ])
@@ -232,6 +234,7 @@ def build_model(resume_epoch):
     is_new = (resume_epoch==0)
     found = True
     num_classes = 51 if args.dataset =='hmdb51' else 101
+    print("====================")
     model = models.__dict__[args.arch](pretrained=is_new, num_classes=num_classes)
     if not is_new:
         path = os.path.join(model_path,'{0:03d}_checkpoint.pth.tar'.format(resume_epoch))
@@ -265,8 +268,10 @@ def train(train_loader, model, criterion, optimizer, epoch):
         target = target.cuda(async=True)
         input_var = torch.autograd.Variable(input)
         target_var = torch.autograd.Variable(target)
-        output = model(input_var)
-
+        if args.arch =='rgb_inception_v3':
+            output, __= model(input_var)
+        else:   
+            output= model(input_var)
         # measure accuracy and record loss
         prec1, prec3 = accuracy(output.data, target, topk=(1, 3))
         acc_mini_batch += prec1[0]
