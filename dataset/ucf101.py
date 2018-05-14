@@ -75,7 +75,7 @@ def ReadSegmentRGB(path, offsets, new_height, new_width, new_length, is_color, n
     for offset_id in range(len(offsets)):	
         offset = offsets[offset_id]
         for length_id in range(1, new_length+1):
-            frame_name = name_pattern % (duration)
+            frame_name = name_pattern % (length_id + offset)
             frame_path = path + "/" + frame_name
             cv_img_origin = cv2.imread(frame_path, cv_read_flag)
             if cv_img_origin is None:
@@ -167,8 +167,6 @@ class ucf101(data.Dataset):
                 self.name_pattern = "visual_rhythm_%05d.jpg"
             elif self.modality == "flow":
                 self.name_pattern = "flow_%s_%05d.jpg"
-            elif self.modality == "history":
-                self.name_pattern = "history_motion_%05d.jpg"
 
         self.is_color = is_color
         self.num_segments = num_segments
@@ -211,7 +209,7 @@ class ucf101(data.Dataset):
                                         self.name_pattern,
                                         duration
                                         )
-        elif self.modality == "rhythm" or self.modality == "history":
+        elif self.modality == "rhythm":
             clip_input = ReadSegment(path,
                                         offsets,
                                         self.new_height,

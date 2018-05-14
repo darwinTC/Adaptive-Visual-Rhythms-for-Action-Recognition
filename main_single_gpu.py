@@ -28,8 +28,8 @@ parser.add_argument('data', metavar='DIR',
 parser.add_argument('--settings', metavar='DIR', default='./datasets/settings',
                     help='path to datset setting files')
 parser.add_argument('--modality', '-m', metavar='MODALITY', default='rgb',
-                    choices=["rgb", "flow", "rhythm", "history"],
-                    help='modality: rgb | flow | rhythm | history')
+                    choices=["rgb", "flow", "rhythm"],
+                    help='modality: rgb | flow | rhythm')
 parser.add_argument('--dataset', '-d', default='ucf101',
                     choices=["ucf101", "hmdb51"],
                     help='dataset: ucf101 | hmdb51')
@@ -78,7 +78,11 @@ os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"
 os.environ["CUDA_VISIBLE_DEVICES"]="0"
 
 def createNewDataset(fileNameRead, fileNameWrite):
-
+    '''
+        Generate new train file to train the network with two RGB images,
+        taking the first and second images randomly in the first and second 
+        half respectively
+    '''
     newPathFile = os.path.join(args.settings, args.dataset, fileNameWrite)
     train_setting_file = fileNameRead % (args.modality, args.split)
     pathFile = os.path.join(args.settings, args.dataset, train_setting_file)    
@@ -88,12 +92,11 @@ def createNewDataset(fileNameRead, fileNameWrite):
     detallLines = list()
     for line in linesFile:
         lineInfo = line.split(' ')
-        # rgb 5 and size - 5
-        detallLines.append('{} {} {}'.format(lineInfo[0], 1, lineInfo[2]))
-        detallLines.append('{} {} {}'.format(lineInfo[0], 2, lineInfo[2]))
-
+        first_frame = random.randint(0, int(lineInfor[1])//2-4)
+        second_frame = int(lineInfor[1])//2 + random.randint(0, int(lineInfor[1])//2-4)
+        detallLines.append('{} {} {}'.format(lineInfo[0], first_frame, lineInfo[2]))
+        detallLines.append('{} {} {}'.format(lineInfo[0], second_frame, lineInfo[2]))
     open(newPathFile,'w').writelines(detallLines)
-
 
 def main():
     global args, best_prec1
