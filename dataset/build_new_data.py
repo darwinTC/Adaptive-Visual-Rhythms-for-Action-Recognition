@@ -1,9 +1,9 @@
-"""
+'''
     author : darwinTC (darwin.ttito.c@gmail.com)
     data : 20/04/2018
-    description : methods to create the visual rhythm for each video of UCF101 and
+    description : methods to create several type of visual rhythm to videos of UCF101 and
                   HMDB51 dataset
-"""
+'''
 import os
 import sys
 import glob
@@ -11,6 +11,8 @@ import argparse
 import numpy as np
 import cv2
 from multiprocessing import Pool, current_process
+from skimage.feature import hog
+from skimage import data, color, exposure
 
 
 def load_video(file_name, height = 240, width = 320, flag = False):
@@ -20,7 +22,6 @@ def load_video(file_name, height = 240, width = 320, flag = False):
         height : 240
     '''
     vidcap = cv2.VideoCapture(file_name)
-    cnt = 0
     frames = []
     success, img = vidcap.read()
     while success:
@@ -32,6 +33,9 @@ def load_video(file_name, height = 240, width = 320, flag = False):
 
     missing_frames = 0
     number_frames = len(frames)
+    # return the current frames if we need to calculate the gradient or HOG images
+    if not flag:
+        return frames
     # complete the number of frame missing   
     if width > len(frames):
         missing_frames = width - number_frames;
@@ -46,11 +50,14 @@ def load_video(file_name, height = 240, width = 320, flag = False):
         if aditional !=0:
             new_frames.append(frame)
             aditional -= 1
+    print('here')
     return new_frames
 
 def visual_rhythm_diagonal_down_top(frames, path, vid_name, height = 240, width = 320):
     '''
-        create visual rhythm images from the diagonal of each frame
+        Create a column for the visual rhythm image from each frame of any video, where each value of
+        this column is a value of the frame' diagonal (from bottom to top and left to right).
+
         0 0 0 4       1
         0 0 3 0       2
         0 2 0 0 ==>   3
@@ -81,15 +88,17 @@ def visual_rhythm_diagonal_down_top(frames, path, vid_name, height = 240, width 
 
     if os.path.isfile(path%(4)):
         os.remove(path%(4))
-    print("Creating vertical visual rhythm to video : {0}.jpg".format(vid_name))
+    print('Creating vertical visual rhythm to video : {0}.avi'.format(vid_name))
     image_rhythm = np.dstack((rhythm_red,rhythm_green ,rhythm_blue)) 
     cv2.imwrite(path % (4), image_rhythm)
-    #path2 = "../visual_rhythm2/"+vid_name+".jpg"
+    #path2 = '../visual_rhythm2/'+vid_name+'.jpg'
     #cv2.imwrite(path2, image_rhythm)     
 
 def visual_rhythm_diagonal_top_down(frames, path, vid_name, height = 240, width = 320):
     '''
-        create visual rhythm images from the diagonal of each frame
+        Create a column for the visual rhythm image from each frame of any video, where each value of
+        this column is a value of the frame' diagonal (from top to bottom and left to right).
+
         1 0 0 0        1
         0 2 0 0        2
         0 0 3 0  ==>   3
@@ -120,15 +129,20 @@ def visual_rhythm_diagonal_top_down(frames, path, vid_name, height = 240, width 
 
     if os.path.isfile(path%(3)):
         os.remove(path%(3))
-    print("Creating vertical visual rhythm to video : {0}.jpg".format(vid_name))
+    print('Creating vertical visual rhythm to video : {0}.avi'.format(vid_name))
     image_rhythm = np.dstack((rhythm_red,rhythm_green ,rhythm_blue)) 
     cv2.imwrite(path % (3), image_rhythm)
-    #path2 = "../visual_rhythm/"+vid_name+".jpg"
+    #path2 = '../visual_rhythm/'+vid_name+'.jpg'
     #cv2.imwrite(path2, image_rhythm)   
    
 def create_visual_rhythm_mean_horizontal_vertical(frames, path, vid_name, height = 240, width = 240):   
     '''
-        Create horizontal and vertical visual rhythm image from a video
+        Create a column for the visual rhythm image from each frame of any video, where each value of
+        this column is the mean of values of its respective row and column.
+
+        1 2 3    mean(mean(1,2,3), mean(1,4,7)) ..
+        4 5 6 => mean(mean(4,5,6), mean(2,5,8)) ..
+        7 8 9    mean(mean(7,8,9), mean(3,6,9)) .. 
     '''        
     rhythm_red = np.array([]).reshape(0,1)  
     rhythm_green = np.array([]).reshape(0,1)
@@ -150,7 +164,6 @@ def create_visual_rhythm_mean_horizontal_vertical(frames, path, vid_name, height
             rhythm_red = np.concatenate((rhythm_red,r_mean), axis=1) 
             rhythm_green = np.concatenate((rhythm_green,g_mean), axis=1) 
             rhythm_blue = np.concatenate((rhythm_blue,b_mean), axis=1)
-    #print(rhythm_red.shape)
     
     if rhythm_red.shape[1] > width :
         rhythm_red = cv2.resize(rhythm_red,(width,height), cv2.INTER_LINEAR) 
@@ -159,15 +172,20 @@ def create_visual_rhythm_mean_horizontal_vertical(frames, path, vid_name, height
         
     if os.path.isfile(path%(5)):
         os.remove(path%(5))
-    print("Creating horizontal visual rhythm to video : {0}.jpg".format(vid_name))
+    print('Creating horizontal visual rhythm to video : {0}.avi'.format(vid_name))
     image_rhythm = np.dstack((rhythm_red,rhythm_green ,rhythm_blue)) 
     cv2.imwrite(path % (5), image_rhythm)
-    #path2 = "../visual-rhythm/"+vid_name+".jpg"
+    #path2 = '../visual-rhythm/'+vid_name+'.jpg'
     #cv2.imwrite(path2, image_rhythm)
  
 def create_visual_rhythm_mean_horizontal(frames, path, vid_name, height = 240, width = 320):   
     '''
-        Create horizontal visual rhythm image from a video
+        Create a column for the visual rhythm image from each frame of any video, where each value of
+        this column is the mean of values of its respective row. 
+
+        1 2 3    mean(1,2,3) ...
+        4 5 6 => mean(4,5,6) ...
+        7 8 9    mean(7,8,9) ...
     '''
     rhythm_red = np.array([]).reshape(0,1)  
     rhythm_green = np.array([]).reshape(0,1)
@@ -186,7 +204,6 @@ def create_visual_rhythm_mean_horizontal(frames, path, vid_name, height = 240, w
             rhythm_red = np.concatenate((rhythm_red,r_mean), axis=1) 
             rhythm_green = np.concatenate((rhythm_green,g_mean), axis=1) 
             rhythm_blue = np.concatenate((rhythm_blue,b_mean), axis=1)
-    #print(rhythm_red.shape)
     
     if rhythm_red.shape[1] > width :
         rhythm_red = cv2.resize(rhythm_red,(width,height), cv2.INTER_LINEAR) 
@@ -195,15 +212,20 @@ def create_visual_rhythm_mean_horizontal(frames, path, vid_name, height = 240, w
 
     if os.path.isfile(path%(1)):
         os.remove(path%(1))
-    print("Creating horizontal visual rhythm to video : {0}.jpg".format(vid_name))
+    print('Creating horizontal visual rhythm to video : {0}.avi'.format(vid_name))
     image_rhythm = np.dstack((rhythm_red,rhythm_green ,rhythm_blue)) 
     cv2.imwrite(path % (1), image_rhythm)
-    #path2 = "../visual-rhythm/"+vid_name+".jpg"
+    #path2 = '../visual-rhythm/'+vid_name+'.jpg'
     #cv2.imwrite(path2, image_rhythm)
 
 def create_visual_rhythm_mean_vertical(frames, path, vid_name, height = 240, width = 320):   
     '''
-        Create vertical visual rhythm image from a video
+        Create a row for the visual rhythm image from each frame of any video,  where each value of
+        this row is the mean of values of its respective column. 
+
+        1 2 3        .           .           .
+        4 5 6 => mean(1,4,7) mean(2,5,8) mean(3,6,9)
+        7 8 9        .           .           .
     '''
     rhythm_red = np.array([])
     rhythm_green = np.array([])
@@ -225,10 +247,10 @@ def create_visual_rhythm_mean_vertical(frames, path, vid_name, height = 240, wid
 
     if os.path.isfile(path%(2)):
         os.remove(path%(2))
-    print("Creating vertical visual rhythm to video : {0}.jpg".format(vid_name))
+    print('Creating vertical visual rhythm to video : {0}.avi'.format(vid_name))
     image_rhythm = np.dstack((rhythm_red,rhythm_green ,rhythm_blue)) 
     cv2.imwrite(path % (2), image_rhythm)
-    #path2 = "../visual_rhythm2/"+vid_name+".jpg"
+    #path2 = '../visual_rhythm2/'+vid_name+'.jpg'
     #cv2.imwrite(path2, image_rhythm)
 
 def create_visual_rhythm_gray_scale(frames, height = 240, width = 320):
@@ -241,42 +263,52 @@ def create_visual_rhythm_gray_scale(frames, height = 240, width = 320):
         rhythm = cv2.resize(rhythm,(width,height), cv2.INTER_LINEAR)
     return rhythm
 
-def create_image_gradients(frames, out_full_path, path, vid_name, height = 240, width = 320):
+def create_visual_rhythm_with_gradients(frames, path, vid_name, height = 240, width = 320):
+    '''
+        first, is created the gradients(X,Y,XX,YY) of each video' frame and this new frames are store
+        in an array, next is created visual rhythm images for each new amount of frame.
+    '''
     labels = ['x','y']    
     gradientX = []
     gradientY = []
     gradientXX = []
     gradientYY = []
     for index, img in enumerate(frames):
-        sobelx = cv2.Sobel(img,cv2.CV_64F,1,0,ksize=3)
-        gradientX.append(sobelx)
-        sobely = cv2.Sobel(img,cv2.CV_64F,0,1,ksize=3)
-        gradientY.append(sobely)
-        sobelxx = cv2.Sobel(sobelx,cv2.CV_64F,1,0,ksize=3)
-        gradientXX.append(sobelxx)
-        sobelyy = cv2.Sobel(sobely,cv2.CV_64F,0,1,ksize=3)
-        gradientYY.append(sobelyy)
+        gradientX.append(cv2.Sobel(img,cv2.CV_64F,1,0,ksize=3))
+        gradientY.append(cv2.Sobel(img,cv2.CV_64F,0,1,ksize=3))
+        gradientXX.append(cv2.Sobel(sobelx,cv2.CV_64F,1,0,ksize=3))
+        gradientYY.append(cv2.Sobel(sobely,cv2.CV_64F,0,1,ksize=3))
     
     rhythm_x = create_visual_rhythm_gray_scale(gradientX)
     rhythm_y = create_visual_rhythm_gray_scale(gradientY)
-    print("Creating : {}".format(vid_name))
+    print('Creating : {}'.format(vid_name))
     #cv2.imwrite(path % (7), rhythm_x)
     #cv2.imwrite(path % (8), rhythm_y)
-    path2 = "../gradients/"+vid_name+".jpg"
+    path2 = '../gradients/'+vid_name+'.jpg'
     cv2.imwrite(path2, rhythm_y)
-    
-    '''
-    for index, img in enumerate(frames):
-        for index_, label in enumerate(labels):
-            path_image = path.format(out_full_path, label) % (index)
-            if os.path.isfile(path_image):
-                print("remove : "+path_image)
-                os.remove(path_image)         
-    '''
+
+def create_images_hog(frames, path, vid_name, height = 240, width = 320):
+    new_frames=[]
+    for i, image in enumerate(frames):          
+        __, hog_image = hog(image, orientations=8, pixels_per_cell=(8, 8),
+                            cells_per_block=(1, 1), visualise=True)
+        print('Creating HOG to video : {}.avi'.format(vid.name))
+        hog_image = hog_image*50
+        new_frames.append(hog_image)
+        #cv2.imwrite(path % (i+1), hog_image)
+    # create visual rhythm from the hog images    
+    #print('Creating visual rhythm images to video '+vid_name)
+    #VR = create_visual_rhythm_gray_scale(new_frames)
+    #cv2.imwrite('../hog/'+vid_name+'.jpg',VR)    
 
 def run_create_images(vid_item):
     '''
-        Create visual rhythm and gradients images
+        Create several type of visual rhythm, gradients and hog images
+        rhythm-H : horizontal visual rhythm
+        rhythm-V : vertical visual rhythm
+        rhythm-HV : mean(horizontal ,vertical) visual rhythm
+        rhythm-DTD : diagonal visual rhythm (from top to down)
+        rhythm-DDT : diagonal visual rhythm (from down to top)
     '''
     vid_path = vid_item[0]
     vid_id = vid_item[1]
@@ -289,25 +321,28 @@ def run_create_images(vid_item):
     current = current_process()
     dev_id = (int(current._identity[0]) - 1) % NUM_GPU
     visual_rhythm_path = '{}/visual_rhythm_%05d.jpg'.format(out_full_path)
-    frames = load_video(vid_path, width = 320, flag = (modality != 'gradients'))
+    frames = load_video(vid_path, width = 320, flag = modality[0:6] == 'rhythm'))
     if modality == 'rhythm-H':
         create_visual_rhythm_mean_horizontal(frames, visual_rhythm_path,vid_name)
     elif modality == 'rhythm-V':    
         create_visual_rhythm_mean_vertical(frames, visual_rhythm_path,vid_name)
     elif modality == 'rhythm-HV':
         create_visual_rhythm_mean_horizontal_vertical(frames, visual_rhythm_path,vid_name)    
-    elif modality == 'gradients':
-        gradients_path = '{}/gradient_{}_%05d.jpg'
-        create_image_gradients(frames, out_full_path, visual_rhythm_path,vid_name)
     elif modality == 'rhythm-DTD':
         visual_rhythm_diagonal_top_down(frames, visual_rhythm_path,vid_name)
     elif modality == 'rhythm-DDT':
         visual_rhythm_diagonal_down_top(frames, visual_rhythm_path,vid_name)
+    elif modality == 'gradients':
+        gradients_path = out_full_path+'/gradient_%05d.jpg'
+        create_visual_rhythm_with_gradients(frames, gradients_path,vid_name)
+    elif modality =='hog':
+        hog_path = out_full_path+'/hog_%05d.jpg'
+        create_images_hog(frames, hog_path, vid_name)
     return True;
 
 def create_train_test_files(path):
     '''
-        Create files to train and test
+        Create train and test files to visual rhythm
     '''
     path_train = path + '/ucf101/train_flow_split{:d}.txt'
     path_test = path + '/ucf101/val_flow_split{:d}.txt'
@@ -317,7 +352,7 @@ def create_train_test_files(path):
 
     def line2rec(line):
         items = line.strip().split(' ')
-        return "{0} {1} {2}".format(items[0],1,items[2])
+        return '{0} {1} {2}'.format(items[0],1,items[2])
     splits = []
     for i in range(1, 4):
         train_list = [line2rec(x) for x in open(path_train.format(i))]
@@ -326,32 +361,32 @@ def create_train_test_files(path):
         new_train = open(path_train_rhythm.format(i),'w')
         new_test = open(path_test_rhythm.format(i),'w')
         for line in train_list:
-            new_train.write("{}\n".format(line))
+            new_train.write('{}\n'.format(line))
         for line in test_list:
-            new_test.write("{}\n".format(line))
+            new_test.write('{}\n'.format(line))
         new_train.close()
         new_test.close()
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description="extract visual rhythm ")
-    parser.add_argument("--src_dir", type=str, default='./UCF-101',
+    parser = argparse.ArgumentParser(description='extract visual rhythm ')
+    parser.add_argument('--src_dir', type=str, default='./UCF-101',
                         help='path to the video data')
-    parser.add_argument("--out_dir", type=str, default='./ucf101_frames',
+    parser.add_argument('--out_dir', type=str, default='./ucf101_frames',
                         help='path to store visual thythm')
-    parser.add_argument("--new_width", type=int, default=0, help='resize image width')
-    parser.add_argument("--new_height", type=int, default=0, help='resize image height')
+    parser.add_argument('--new_width', type=int, default=0, help='resize image width')
+    parser.add_argument('--new_height', type=int, default=0, help='resize image height')
 
-    parser.add_argument("--num_worker", type=int, default=8)
-    parser.add_argument("--num_gpu", type=int, default=2, help='number of GPU')
-    parser.add_argument("--out_format", type=str, default='dir', choices=['dir','zip'],
+    parser.add_argument('--num_worker', type=int, default=8)
+    parser.add_argument('--num_gpu', type=int, default=2, help='number of GPU')
+    parser.add_argument('--out_format', type=str, default='dir', choices=['dir','zip'],
                         help='path to the visual rhythm')
-    parser.add_argument("--ext", type=str, default='avi', choices=['avi','mp4'],
+    parser.add_argument('--ext', type=str, default='avi', choices=['avi','mp4'],
                         help='video file extensions')
     parser.add_argument('--modality', '-m', metavar='MODALITY', default='rhythm-H',
-                        choices=["rhythm-H", "rhythm-V", "rhythm-HV", "gradients", "rhythm-DTD", "rhythm-DDT"],
-                        help='modality: rhythm-H | rhythm-V | rhythm-HV | gradients | rhythm-DTD | rhythm-DDT ')
+                        choices=['rhythm-H', 'rhythm-V', 'rhythm-HV', 'rhythm-DTD', 'rhythm-DDT', 'gradients','hog'],
+                        help='modality: rhythm-H | rhythm-V | rhythm-HV | rhythm-DTD | rhythm-DDT | gradients | hog')
     parser.add_argument('--type_gradient', '-tg', metavar='GRADIENT', default='gradient_x',
-                        choices=["gradient_x", "gradient_y"],
+                        choices=['gradient_x', 'gradient_y'],
                         help='modality: gradient_x | gradient_y')
 
     args = parser.parse_args()
@@ -365,10 +400,9 @@ if __name__ == '__main__':
     NUM_GPU = args.num_gpu
 
     if not os.path.isdir(out_path):
-        print("creating folder: "+out_path)
+        print('creating folder: '+out_path)
         os.makedirs(out_path)
 
     vid_list = glob.glob(src_path+'/*/*.'+ext)
-    print(vid_list)
     pool = Pool(num_worker)
     pool.map(run_create_images, zip(vid_list, range(len(vid_list))))
