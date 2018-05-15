@@ -15,6 +15,29 @@ from skimage.feature import hog
 from skimage import data, color, exposure
 
 
+def complete_frames(frames, height = 240, width = 320):
+    '''
+        Increase the number of frames to be able to obtain the desired
+        dimensions of an image.
+    '''
+    missing_frames = 0
+    number_frames = len(frames)
+    # complete the number of frame missing   
+    if width > len(frames):
+        missing_frames = width - number_frames;
+    iterator = missing_frames // number_frames
+    aditional = missing_frames % number_frames if missing_frames % number_frames != 0 else 0
+        
+    new_frames = []
+    for frame in frames:
+        new_frames.append(frame)
+        for i in range(0,iterator):
+            new_frames.append(frame)
+        if aditional !=0:
+            new_frames.append(frame)
+            aditional -= 1
+    return new_frames  
+
 def load_video(file_name, height = 240, width = 320, flag = False):
     '''
         Load Video
@@ -31,27 +54,11 @@ def load_video(file_name, height = 240, width = 320, flag = False):
         frames.append(img)
         success, img = vidcap.read()
 
-    missing_frames = 0
-    number_frames = len(frames)
     # return the current frames if we need to calculate the gradient or HOG images
     if not flag:
         return frames
-    # complete the number of frame missing   
-    if width > len(frames):
-        missing_frames = width - number_frames;
-    iterator = missing_frames // number_frames
-    aditional = missing_frames % number_frames if missing_frames % number_frames != 0 else 0
-        
-    new_frames = []
-    for frame in frames:
-        new_frames.append(frame)
-        for i in range(0,iterator):
-            new_frames.append(frame)
-        if aditional !=0:
-            new_frames.append(frame)
-            aditional -= 1
-    print('here')
-    return new_frames
+    else:
+        return complete_frames(frames, height, width)
 
 def visual_rhythm_diagonal_down_top(frames, path, vid_name, height = 240, width = 320):
     '''
@@ -295,11 +302,33 @@ def create_images_hog(frames, path, vid_name, height = 240, width = 320):
         print('Creating HOG to video : {}.avi'.format(vid.name))
         hog_image = hog_image*50
         new_frames.append(hog_image)
-        #cv2.imwrite(path % (i+1), hog_image)
+        cv2.imwrite(path % (i+1), hog_image)
     # create visual rhythm from the hog images    
     #print('Creating visual rhythm images to video '+vid_name)
     #VR = create_visual_rhythm_gray_scale(new_frames)
     #cv2.imwrite('../hog/'+vid_name+'.jpg',VR)    
+
+def create_visual_rhythm_from_optical_flow(visual_rhythm_path, out_full_path, vid_name, height = 240, width = 320):
+    '''
+        create visual rhythm with previous optical flow images
+    '''
+    path_images = [elem.split('/')[-1] for elem in glob.glob(os.path.join(out_full_path, '*'))]
+    flow_x = sorted([os.path.join(out_full_path,elem) for elem in path_images if elem[:6]=='flow_x'])
+    flow_y = sorted([os.path.join(out_full_path,elem) for elem in path_images if elem[:6]=='flow_y'])
+
+    # read images from flow_x and flow_y
+    flow_x = [cv2.cvtColor(cv2.imread(dir_img),cv2.COLOR_RGB2GRAY) for dir_img in flow_x]
+    flow_y = [cv2.cvtColor(cv2.imread(dir_img),cv2.COLOR_RGB2GRAY) for dir_img in flow_y]
+
+    new_flow_x = complete_frames(flow_x)
+    new_flow_y = complete_frames(flow_y)
+    
+    RV_flow_x = create_visual_rhythm_gray_scale(new_flow_x)
+    RV_flow_y = create_visual_rhythm_gray_scale(new_flow_y)
+    
+    print('creating visual rhythm images to video : ' + vid_name)
+    cv2.imwrite('../RV_flow/'+vid_name+'_flow_x.jpg',RV_flow_x)
+    cv2.imwrite('../RV_flow/'+vid_name+'_flow_y.jpg',RV_flow_x)
 
 def run_create_images(vid_item):
     '''
@@ -309,6 +338,7 @@ def run_create_images(vid_item):
         rhythm-HV : mean(horizontal ,vertical) visual rhythm
         rhythm-DTD : diagonal visual rhythm (from top to down)
         rhythm-DDT : diagonal visual rhythm (from down to top)
+        rhythm-OF : visual rhythm - optical flow
     '''
     vid_path = vid_item[0]
     vid_id = vid_item[1]
@@ -321,7 +351,7 @@ def run_create_images(vid_item):
     current = current_process()
     dev_id = (int(current._identity[0]) - 1) % NUM_GPU
     visual_rhythm_path = '{}/visual_rhythm_%05d.jpg'.format(out_full_path)
-    frames = load_video(vid_path, width = 320, flag = modality[0:6] == 'rhythm'))
+    frames = load_video(vid_path, width = 320, flag = (modality[0:6] == 'rhythm'))
     if modality == 'rhythm-H':
         create_visual_rhythm_mean_horizontal(frames, visual_rhythm_path,vid_name)
     elif modality == 'rhythm-V':    
@@ -338,6 +368,8 @@ def run_create_images(vid_item):
     elif modality =='hog':
         hog_path = out_full_path+'/hog_%05d.jpg'
         create_images_hog(frames, hog_path, vid_name)
+    elif modality == 'rhythm-OF':
+        create_visual_rhythm_from_optical_flow(visual_rhythm_path, out_full_path, vid_name)
     return True;
 
 def create_train_test_files(path):
@@ -383,8 +415,8 @@ if __name__ == '__main__':
     parser.add_argument('--ext', type=str, default='avi', choices=['avi','mp4'],
                         help='video file extensions')
     parser.add_argument('--modality', '-m', metavar='MODALITY', default='rhythm-H',
-                        choices=['rhythm-H', 'rhythm-V', 'rhythm-HV', 'rhythm-DTD', 'rhythm-DDT', 'gradients','hog'],
-                        help='modality: rhythm-H | rhythm-V | rhythm-HV | rhythm-DTD | rhythm-DDT | gradients | hog')
+                        choices=['rhythm-H', 'rhythm-V', 'rhythm-HV', 'rhythm-DTD', 'rhythm-OF', 'rhythm-DDT', 'gradients','hog'],
+                        help='modality: rhythm-H | rhythm-V | rhythm-HV | rhythm-DTD | rhythm-OF | rhythm-DDT | gradients | hog')
     parser.add_argument('--type_gradient', '-tg', metavar='GRADIENT', default='gradient_x',
                         choices=['gradient_x', 'gradient_y'],
                         help='modality: gradient_x | gradient_y')
