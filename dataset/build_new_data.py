@@ -272,7 +272,7 @@ def create_visual_rhythm_gray_scale(frames, height = 240, width = 320):
 
 def create_visual_rhythm_with_gradients(frames, path, vid_name, height = 240, width = 320):
     '''
-        first, is created the gradients(X,Y,XX,YY) of each video' frame and this new frames are store
+        First, is created the gradients(X,Y,XX,YY) of each video' frame and this new frames are store
         in an array, next is created visual rhythm images for each new amount of frame.
     '''
     labels = ['x','y']    
@@ -295,11 +295,14 @@ def create_visual_rhythm_with_gradients(frames, path, vid_name, height = 240, wi
     cv2.imwrite(path2, rhythm_y)
 
 def create_images_hog(frames, path, vid_name, height = 240, width = 320):
+    '''
+        This method create HOG images from each frame of any video.
+    '''
     new_frames=[]
     for i, image in enumerate(frames):          
         __, hog_image = hog(image, orientations=8, pixels_per_cell=(8, 8),
                             cells_per_block=(1, 1), visualise=True)
-        print('Creating HOG to video : {}.avi'.format(vid.name))
+        print('Creating HOG to video : {}.avi'.format(vid_name))
         hog_image = hog_image*50
         new_frames.append(hog_image)
         cv2.imwrite(path % (i+1), hog_image)
@@ -310,7 +313,7 @@ def create_images_hog(frames, path, vid_name, height = 240, width = 320):
 
 def create_visual_rhythm_from_optical_flow(visual_rhythm_path, out_full_path, vid_name, height = 240, width = 320):
     '''
-        create visual rhythm with previous optical flow images
+        Create visual rhythm with previous optical flow images
     '''
     path_images = [elem.split('/')[-1] for elem in glob.glob(os.path.join(out_full_path, '*'))]
     flow_x = sorted([os.path.join(out_full_path,elem) for elem in path_images if elem[:6]=='flow_x'])
@@ -329,6 +332,31 @@ def create_visual_rhythm_from_optical_flow(visual_rhythm_path, out_full_path, vi
     print('creating visual rhythm images to video : ' + vid_name)
     cv2.imwrite('../RV_flow/'+vid_name+'_flow_x.jpg',RV_flow_x)
     cv2.imwrite('../RV_flow/'+vid_name+'_flow_y.jpg',RV_flow_x)
+
+def create_HOG_from_optical_flow(out_full_path, vid_name):
+    '''
+        This method create HOG images from previous optical flow images, this is
+        because the optical images contain very relevant information of the actor
+        excluing the background, so taked this images is better than the RGB one.
+    '''
+    path_images = [elem.split('/')[-1] for elem in glob.glob(os.path.join(out_full_path, '*'))]
+    flow_x = sorted([os.path.join(out_full_path,elem) for elem in path_images if elem[:6]=='flow_x'])
+    flow_y = sorted([os.path.join(out_full_path,elem) for elem in path_images if elem[:6]=='flow_y'])
+
+    # read images from flow_x and flow_y
+    flow_x = [cv2.cvtColor(cv2.imread(dir_img),cv2.COLOR_RGB2GRAY) for dir_img in flow_x]
+    flow_y = [cv2.cvtColor(cv2.imread(dir_img),cv2.COLOR_RGB2GRAY) for dir_img in flow_y]    
+
+    print('creating images to video: '+vid_name)
+    for i in range(len(flow_x)):
+        __, img_x = hog(flow_x[i], orientations=8, pixels_per_cell=(8, 8),
+                                cells_per_block=(1, 1), visualise=True)
+        __, img_y = hog(flow_y[i], orientations=8, pixels_per_cell=(8, 8),
+                                cells_per_block=(1, 1), visualise=True)
+        img_x = img_x*200
+        img_y = img_y*200
+        cv2.imwrite(os.path.join(out_full_path,'hog_x_%05d.jpg')%(i+1),img_x)
+        cv2.imwrite(os.path.join(out_full_path,'hog_y_%05d.jpg')%(i+1),img_y)
 
 def run_create_images(vid_item):
     '''
@@ -370,6 +398,8 @@ def run_create_images(vid_item):
         create_images_hog(frames, hog_path, vid_name)
     elif modality == 'rhythm-OF':
         create_visual_rhythm_from_optical_flow(visual_rhythm_path, out_full_path, vid_name)
+    elif modality == 'HOF-OF':
+        create_HOG_from_optical_flow(out_full_path, vid_name)
     return True;
 
 def create_train_test_files(path):
@@ -415,8 +445,8 @@ if __name__ == '__main__':
     parser.add_argument('--ext', type=str, default='avi', choices=['avi','mp4'],
                         help='video file extensions')
     parser.add_argument('--modality', '-m', metavar='MODALITY', default='rhythm-H',
-                        choices=['rhythm-H', 'rhythm-V', 'rhythm-HV', 'rhythm-DTD', 'rhythm-OF', 'rhythm-DDT', 'gradients','hog'],
-                        help='modality: rhythm-H | rhythm-V | rhythm-HV | rhythm-DTD | rhythm-OF | rhythm-DDT | gradients | hog')
+                        choices=['rhythm-H', 'rhythm-V', 'rhythm-HV', 'rhythm-DTD', 'rhythm-OF', 'rhythm-DDT', 'gradients','hog', 'HOF-OF'],
+                        help='modality: rhythm-H | rhythm-V | rhythm-HV | rhythm-DTD | rhythm-OF | rhythm-DDT | gradients | hog | HOF-OF')
     parser.add_argument('--type_gradient', '-tg', metavar='GRADIENT', default='gradient_x',
                         choices=['gradient_x', 'gradient_y'],
                         help='modality: gradient_x | gradient_y')
