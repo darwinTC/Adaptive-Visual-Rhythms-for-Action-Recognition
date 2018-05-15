@@ -1,3 +1,3 @@
-from .ucf101 import ucf101
+from .load_dataset import dataset
 
-__all__ = ('ucf101','hmdb51')
+__all__ = ('dataset')

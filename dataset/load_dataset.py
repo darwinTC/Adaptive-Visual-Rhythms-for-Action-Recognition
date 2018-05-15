@@ -20,7 +20,7 @@ def make_dataset(root, source):
         in each line.
     '''
     if not os.path.exists(source):
-        print('Setting file %s for ucf101 dataset doesnt exist.' % (source))
+        print('Setting file %s for the dataset doesnt exist.' % (source))
         sys.exit()
     else:
         clips = []
@@ -107,7 +107,7 @@ def read_multiple_segment(path, offsets, new_height, new_width, new_length, is_c
     return clip_input
 
 
-class ucf101(data.Dataset):
+class dataset(data.Dataset):
 
     def __init__(self,
                  root,

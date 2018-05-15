@@ -173,7 +173,7 @@ def main():
     if not os.path.exists(train_split_file) or not os.path.exists(val_split_file):
         print("No split file exists in %s directory. Preprocess the dataset first" % (args.settings))
 
-    train_dataset = datasets.__dict__['ucf101'](root=args.data,
+    train_dataset = datasets.__dict__['dataset'](root=args.data,
                                                     source=train_split_file,
                                                     phase="train",
                                                     modality=args.modality,
@@ -182,7 +182,7 @@ def main():
                                                     new_width=args.new_width,
                                                     new_height=args.new_height,
                                                     video_transform=train_transform)
-    val_dataset = datasets.__dict__['ucf101'](root=args.data,
+    val_dataset = datasets.__dict__['dataset'](root=args.data,
                                                   source=val_split_file,
                                                   phase="val",
                                                   modality=args.modality,
