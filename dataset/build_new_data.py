@@ -311,9 +311,11 @@ def create_images_hog(frames, path, vid_name, height = 240, width = 320):
     #VR = create_visual_rhythm_gray_scale(new_frames)
     #cv2.imwrite('../hog/'+vid_name+'.jpg',VR)    
 
-def create_visual_rhythm_from_optical_flow(visual_rhythm_path, out_full_path, vid_name, height = 240, width = 320):
+def obtain_previous_optical_flow_images(out_full_path):
     '''
-        Create visual rhythm with previous optical flow images
+        Method to obtain the previous optical flow images generated
+        and stored in the folde 'nameDS'_frame, where nameDS is the
+        name of the dataset.
     '''
     path_images = [elem.split('/')[-1] for elem in glob.glob(os.path.join(out_full_path, '*'))]
     flow_x = sorted([os.path.join(out_full_path,elem) for elem in path_images if elem[:6]=='flow_x'])
@@ -321,8 +323,16 @@ def create_visual_rhythm_from_optical_flow(visual_rhythm_path, out_full_path, vi
 
     # read images from flow_x and flow_y
     flow_x = [cv2.cvtColor(cv2.imread(dir_img),cv2.COLOR_RGB2GRAY) for dir_img in flow_x]
-    flow_y = [cv2.cvtColor(cv2.imread(dir_img),cv2.COLOR_RGB2GRAY) for dir_img in flow_y]
+    flow_y = [cv2.cvtColor(cv2.imread(dir_img),cv2.COLOR_RGB2GRAY) for dir_img in flow_y]    
+    
+    return flow_x, flow_y
 
+def create_visual_rhythm_from_optical_flow(visual_rhythm_path, out_full_path, vid_name, height = 240, width = 320):
+    '''
+        Create visual rhythm with previous optical flow images
+    '''
+    flow_x, flow_y = obtain_previous_optical_flow_images(out_full_path)
+    
     new_flow_x = complete_frames(flow_x)
     new_flow_y = complete_frames(flow_y)
     
@@ -339,13 +349,7 @@ def create_HOG_from_optical_flow(out_full_path, vid_name):
         because the optical images contain very relevant information of the actor
         excluing the background, so taked this images is better than the RGB one.
     '''
-    path_images = [elem.split('/')[-1] for elem in glob.glob(os.path.join(out_full_path, '*'))]
-    flow_x = sorted([os.path.join(out_full_path,elem) for elem in path_images if elem[:6]=='flow_x'])
-    flow_y = sorted([os.path.join(out_full_path,elem) for elem in path_images if elem[:6]=='flow_y'])
-
-    # read images from flow_x and flow_y
-    flow_x = [cv2.cvtColor(cv2.imread(dir_img),cv2.COLOR_RGB2GRAY) for dir_img in flow_x]
-    flow_y = [cv2.cvtColor(cv2.imread(dir_img),cv2.COLOR_RGB2GRAY) for dir_img in flow_y]    
+    flow_x, flow_y = obtain_previous_optical_flow_images(out_full_path)  
 
     print('creating images to video: '+vid_name)
     for i in range(len(flow_x)):

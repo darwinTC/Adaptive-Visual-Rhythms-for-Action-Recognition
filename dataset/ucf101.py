@@ -14,9 +14,13 @@ def find_classes(dir):
     return classes, class_to_idx
 
 def make_dataset(root, source):
-
+    '''
+        Method to obtain the path, duration(number of frame) and target of each
+        video of the dataset from a file(train or test) that contain this detalls
+        in each line.
+    '''
     if not os.path.exists(source):
-        print("Setting file %s for ucf101 dataset doesn't exist." % (source))
+        print('Setting file %s for ucf101 dataset doesnt exist.' % (source))
         sys.exit()
     else:
         clips = []
@@ -31,96 +35,73 @@ def make_dataset(root, source):
                 clips.append(item)
     return clips
 
-
-def ReadSegment(path, offsets, new_height, new_width, new_length, is_color, name_pattern):
-    """
-        description: take the visual rhythm and motion history images to train and test any network
-    """
+def color(is_color):
     if is_color:
         cv_read_flag = cv2.IMREAD_COLOR         # > 0
     else:
-        cv_read_flag = cv2.IMREAD_GRAYSCALE     # = 0
-    interpolation = cv2.INTER_LINEAR
+        cv_read_flag = cv2.IMREAD_GRAYSCALE     # = 0    
+    return cv_read_flag
 
+def build_clip_with_multiple_images():
+    print('a')
+    
+def read_single_segment(path, offsets, new_height, new_width, new_length, is_color, name_pattern, index):
+    '''
+        Takes visual_rhythm, history_motion or RGB images, one frame by video,
+        and this correspond to some specific images(type of visual_rhythm or
+        history_motion). 
+    '''
+    cv_read_flag = color(is_color)
+    interpolation = cv2.INTER_LINEAR    
     sampled_list = []
-    for offset_id in range(len(offsets)):
-        offset = offsets[offset_id]
-        for length_id in range(1, new_length+1):
-            frame_name = name_pattern % (2)
-            frame_path = path + "/" + frame_name
-            cv_img_origin = cv2.imread(frame_path, cv_read_flag)
-            if cv_img_origin is None:
-               print("Could not load file %s" % (frame_path))
-               sys.exit()
-               # TODO: error handling here
-            if new_width > 0 and new_height > 0:
-                # use OpenCV3, use OpenCV2.4.13 may have error
-                cv_img = cv2.resize(cv_img_origin, (new_width, new_height), interpolation)
-            else:
-                cv_img = cv_img_origin
-            cv_img = cv2.cvtColor(cv_img, cv2.COLOR_BGR2RGB)
-            sampled_list.append(cv_img)
-            #sampled_list.append(np.expand_dims(cv_img, 2))
+
+    frame_name = name_pattern % (index)
+    frame_path = os.path.join(path, frame_name)
+    cv_img_origin = cv2.imread(frame_path, cv_read_flag)
+    if cv_img_origin is None:
+       print('Could not load file %s' % (frame_path))
+       sys.exit()
+       # TODO: error handling here
+    if new_width > 0 and new_height > 0:
+        # use OpenCV3, use OpenCV2.4.13 may have error
+        cv_img = cv2.resize(cv_img_origin, (new_width, new_height), interpolation)
+    else:
+        cv_img = cv_img_origin
+    cv_img = cv2.cvtColor(cv_img, cv2.COLOR_BGR2RGB)
+    sampled_list.append(cv_img)
+
     clip_input = np.concatenate(sampled_list, axis=2)
-    return clip_input
+    return clip_input 
 
-def ReadSegmentRGB(path, offsets, new_height, new_width, new_length, is_color, name_pattern, duration):
-    if is_color:
-        cv_read_flag = cv2.IMREAD_COLOR         # > 0
-    else:
-        cv_read_flag = cv2.IMREAD_GRAYSCALE     # = 0
+def read_multiple_segment(path, offsets, new_height, new_width, new_length, is_color, name_pattern):
+    '''
+        Concatenates 10 consecutive optical flow images for (flow_x and flow_y),
+        or (HOG_x and HOG_y) having 20 images concatenate by video in the end.
+    '''
+    cv_read_flag = color(is_color)
     interpolation = cv2.INTER_LINEAR
-
     sampled_list = []
-    for offset_id in range(len(offsets)):	
-        offset = offsets[offset_id]
-        for length_id in range(1, new_length+1):
-            frame_name = name_pattern % (length_id + offset)
-            frame_path = path + "/" + frame_name
-            cv_img_origin = cv2.imread(frame_path, cv_read_flag)
-            if cv_img_origin is None:
-               print("Could not load file %s" % (frame_path))
-               sys.exit()
-               # TODO: error handling here
-            if new_width > 0 and new_height > 0:
-                # use OpenCV3, use OpenCV2.4.13 may have error
-                cv_img = cv2.resize(cv_img_origin, (new_width, new_height), interpolation)
-            else:
-                cv_img = cv_img_origin
-            cv_img = cv2.cvtColor(cv_img, cv2.COLOR_BGR2RGB)
-            sampled_list.append(cv_img)
-    clip_input = np.concatenate(sampled_list, axis=2)
-    return clip_input
 
-def ReadSegmentFlow(path, offsets, new_height, new_width, new_length, is_color, name_pattern):
-    if is_color:
-        cv_read_flag = cv2.IMREAD_COLOR         # > 0
-    else:
-        cv_read_flag = cv2.IMREAD_GRAYSCALE     # = 0
-    interpolation = cv2.INTER_LINEAR
-
-    sampled_list = []
-    for offset_id in range(len(offsets)):
-        offset = offsets[offset_id]
-        for length_id in range(1, new_length+1):
-            frame_name_x = name_pattern % ("x", length_id + offset)
-            frame_path_x = path + "/" + frame_name_x
-            cv_img_origin_x = cv2.imread(frame_path_x, cv_read_flag)
-            frame_name_y = name_pattern % ("y", length_id + offset)
-            frame_path_y = path + "/" + frame_name_y
-            cv_img_origin_y = cv2.imread(frame_path_y, cv_read_flag)
-            if cv_img_origin_x is None or cv_img_origin_y is None:
-               print("Could not load file %s or %s" % (frame_path_x, frame_path_y))
-               sys.exit()
-               # TODO: error handling here
-            if new_width > 0 and new_height > 0:
-                cv_img_x = cv2.resize(cv_img_origin_x, (new_width, new_height), interpolation)
-                cv_img_y = cv2.resize(cv_img_origin_y, (new_width, new_height), interpolation)
-            else:
-                cv_img_x = cv_img_origin_x
-                cv_img_y = cv_img_origin_y
-            sampled_list.append(np.expand_dims(cv_img_x, 2))
-            sampled_list.append(np.expand_dims(cv_img_y, 2))
+    offset = offsets[0]
+    for length_id in range(1, new_length+1):
+        frame_name_x = name_pattern % ('x', length_id + offset)
+        frame_path_x = os.path.join(path, frame_name_x)
+        cv_img_origin_x = cv2.imread(frame_path_x, cv_read_flag)
+        frame_name_y = name_pattern % ('y', length_id + offset)
+        frame_path_y = os.path.join(path, frame_name_y)
+        cv_img_origin_y = cv2.imread(frame_path_y, cv_read_flag)
+        if cv_img_origin_x is None or cv_img_origin_y is None:
+           print('Could not load file %s or %s' % (frame_path_x, frame_path_y))
+           sys.exit()
+           # TODO: error handling here
+        if new_width > 0 and new_height > 0:
+            cv_img_x = cv2.resize(cv_img_origin_x, (new_width, new_height), interpolation)
+            cv_img_y = cv2.resize(cv_img_origin_y, (new_width, new_height), interpolation)
+        else:
+            cv_img_x = cv_img_origin_x
+            cv_img_y = cv_img_origin_y
+        sampled_list.append(np.expand_dims(cv_img_x, 2))
+        sampled_list.append(np.expand_dims(cv_img_y, 2))
 
     clip_input = np.concatenate(sampled_list, axis=2)
     return clip_input
@@ -146,8 +127,8 @@ class ucf101(data.Dataset):
         clips = make_dataset(root, source)
         
         if len(clips) == 0:
-            raise(RuntimeError("Found 0 video clips in subfolders of: " + root + "\n"
-                               "Check your data directory."))
+            raise(RuntimeError('Found 0 video clips in subfolders of: ' + root + '\n'
+                               'Check your data directory.'))
 
         self.root = root
         self.source = source
@@ -161,12 +142,16 @@ class ucf101(data.Dataset):
         if name_pattern:
             self.name_pattern = name_pattern
         else:
-            if self.modality == "rgb":
-                self.name_pattern = "img_%05d.jpg"
+            if self.modality == 'rgb':
+                self.name_pattern = 'img_%05d.jpg'
             elif self.modality == 'rhythm':
-                self.name_pattern = "visual_rhythm_%05d.jpg"
-            elif self.modality == "flow":
-                self.name_pattern = "flow_%s_%05d.jpg"
+                self.name_pattern = 'visual_rhythm_%05d.jpg'
+            elif self.modality == 'flow':
+                self.name_pattern = 'flow_%s_%05d.jpg'
+            elif self.modality == 'hog':
+                self.name_pattern = 'hog_%s_%05d.jpg'
+            elif self.modality == 'history':
+                self.name_pattern = 'history_motion_%05d.jpg'
 
         self.is_color = is_color
         self.num_segments = num_segments
@@ -183,43 +168,43 @@ class ucf101(data.Dataset):
         average_duration = int(duration / self.num_segments)
         offsets = []
         for seg_id in range(self.num_segments):
-            if self.phase == "train":
+            if self.phase == 'train':
                 if average_duration >= self.new_length:
                     offset = random.randint(0, average_duration - self.new_length)
                     # No +1 because randint(a,b) return a random integer N such that a <= N <= b.
                     offsets.append(offset + seg_id * average_duration)
                 else:
                     offsets.append(0)
-            elif self.phase == "val":
+            elif self.phase == 'val':
                 if average_duration >= self.new_length:
                     offsets.append(int((average_duration - self.new_length + 1)/2 + seg_id * average_duration))
                 else:
                     offsets.append(0)
             else:
-                print("Only phase train and val are supported.")
+                print('Only phase train and val are supported.')
 
-
-        if self.modality == "rgb":
-            clip_input = ReadSegmentRGB(path,
+        if self.modality == 'rgb':
+            clip_input = read_single_segment(path,
                                         offsets,
                                         self.new_height,
                                         self.new_width,
                                         self.new_length,
                                         self.is_color,
                                         self.name_pattern,
-                                        duration
+                                        1 + offsets[0] # duration 
                                         )
-        elif self.modality == "rhythm":
-            clip_input = ReadSegment(path,
+        elif self.modality == 'rhythm' or self.modality == 'history':
+            clip_input = read_single_segment(path,
                                         offsets,
                                         self.new_height,
                                         self.new_width,
                                         self.new_length,
                                         self.is_color,
-                                        self.name_pattern
+                                        self.name_pattern,
+                                        2 # this number correspond to the type of visual rhythm image
                                         )            
-        elif self.modality == "flow":
-            clip_input = ReadSegmentFlow(path,
+        elif self.modality == 'flow' or self.modality == 'hog':
+            clip_input = read_multiple_segment(path,
                                         offsets,
                                         self.new_height,
                                         self.new_width,
@@ -228,7 +213,7 @@ class ucf101(data.Dataset):
                                         self.name_pattern
                                         )
         else:
-            print("No such modality %s" % (self.modality))
+            print('No such modality %s' % (self.modality))
 
         if self.transform is not None:
             clip_input = self.transform(clip_input)
