@@ -23,8 +23,9 @@ import torchvision.models as models
 
 sys.path.insert(0, "../../")
 import video_transforms
-
+ 
 def VideoTemporalPrediction(
+        mode,
         vid_name,
         net,
         num_categories,
@@ -47,19 +48,22 @@ def VideoTemporalPrediction(
                                      std=clip_std)
     val_transform = video_transforms.Compose([
             video_transforms.ToTensor(),
-            normalize,
+            normalize
         ])
 
     # selection
     step = int(math.floor((duration-optical_flow_frames+1)/num_samples))
-    dims = (256,340,optical_flow_frames*2,num_samples)
+    # inception = 320,360, resnet = 240, 320
+    width = 320
+    height = 360
+    dims = (width,height,optical_flow_frames*2,num_samples)
     flow = np.zeros(shape=dims, dtype=np.float64)
     flow_flip = np.zeros(shape=dims, dtype=np.float64)
 
     for i in range(num_samples):
         for j in range(optical_flow_frames):
-            flow_x_file = os.path.join(vid_name, 'flow_x_{0:05d}.jpg'.format(i*step+j+1 + start_frame))
-            flow_y_file = os.path.join(vid_name, 'flow_y_{0:05d}.jpg'.format(i*step+j+1 + start_frame))
+            flow_x_file = os.path.join(vid_name, mode+'_x_{0:05d}.jpg'.format(i*step+j+1 + start_frame))
+            flow_y_file = os.path.join(vid_name, mode+'_y_{0:05d}.jpg'.format(i*step+j+1 + start_frame))
             img_x = cv2.imread(flow_x_file, cv2.IMREAD_GRAYSCALE)
             img_y = cv2.imread(flow_y_file, cv2.IMREAD_GRAYSCALE)
             img_x = cv2.resize(img_x, dims[1::-1])
@@ -71,17 +75,19 @@ def VideoTemporalPrediction(
             flow_flip[:,:,j*2  ,i] = 255 - img_x[:, ::-1]
             flow_flip[:,:,j*2+1,i] = img_y[:, ::-1]
 
-    # crop
-    flow_1 = flow[:224, :224, :,:]
-    flow_2 = flow[:224, -224:, :,:]
-    flow_3 = flow[16:240, 60:284, :,:]
-    flow_4 = flow[-224:, :224, :,:]
-    flow_5 = flow[-224:, -224:, :,:]
-    flow_f_1 = flow_flip[:224, :224, :,:]
-    flow_f_2 = flow_flip[:224, -224:, :,:]
-    flow_f_3 = flow_flip[16:240, 60:284, :,:]
-    flow_f_4 = flow_flip[-224:, :224, :,:]
-    flow_f_5 = flow_flip[-224:, -224:, :,:]
+    # crop 299 = inception, 224 = resnet
+    size = 299
+    corner = [(height-size)//2, (width-size)//2]
+    flow_1 = flow[:size, :size, :,:]
+    flow_2 = flow[:size, -size:, :,:]
+    flow_3 = flow[corner[1]:corner[1]+size, corner[0]:corner[0]+size, :,:]
+    flow_4 = flow[-size:, :size, :,:]
+    flow_5 = flow[-size:, -size:, :,:]
+    flow_f_1 = flow_flip[:size, :size, :,:]
+    flow_f_2 = flow_flip[:size, -size:, :,:]
+    flow_f_3 = flow_flip[corner[1]:corner[1]+size, corner[0]:corner[0]+size, :,:]
+    flow_f_4 = flow_flip[-size:, :size, :,:]
+    flow_f_5 = flow_flip[-size:, -size:, :,:]
 
     flow = np.concatenate((flow_1,flow_2,flow_3,flow_4,flow_5,flow_f_1,flow_f_2,flow_f_3,flow_f_4,flow_f_5), axis=3)
     
@@ -94,7 +100,7 @@ def VideoTemporalPrediction(
         
     flow_np = np.concatenate(flow_list,axis=0)
 
-    batch_size = 6
+    batch_size = 15
     prediction = np.zeros((num_categories,flow.shape[3]))
     num_batches = int(math.ceil(float(flow.shape[3])/batch_size))
 

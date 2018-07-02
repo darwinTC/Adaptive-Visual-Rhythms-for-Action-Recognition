@@ -1,5 +1,6 @@
 import os
 import time
+import random
 import argparse
 import shutil
 import numpy as np
@@ -28,8 +29,8 @@ parser.add_argument('data', metavar='DIR',
 parser.add_argument('--settings', metavar='DIR', default='./datasets/settings',
                     help='path to datset setting files')
 parser.add_argument('--modality', '-m', metavar='MODALITY', default='rgb',
-                    choices=["rgb", "flow", "rhythm"],
-                    help='modality: rgb | flow | rhythm')
+                    choices=["rgb", "flow", "rhythm", "rgb2"],   
+                    help='modality: rgb| rgb2 | flow | rhythm')
 parser.add_argument('--dataset', '-d', default='ucf101',
                     choices=["ucf101", "hmdb51"],
                     help='dataset: ucf101 | hmdb51')
@@ -42,20 +43,20 @@ parser.add_argument('-s', '--split', default=2, type=int, metavar='S',
                     help='which split of data to work on (default: 1)')
 parser.add_argument('-j', '--workers', default=4, type=int, metavar='N',
                     help='number of data loading workers (default: 4)')
-parser.add_argument('--epochs', default=250, type=int, metavar='N',
+parser.add_argument('--epochs', default=300, type=int, metavar='N',
                     help='number of total epochs to run')
 parser.add_argument('--start-epoch', default=0, type=int, metavar='N',
                     help='manual epoch number (useful on restarts)')
-parser.add_argument('-b', '--batch-size', default=25, type=int,
+parser.add_argument('-b', '--batch-size', default=25 , type=int,
                     metavar='N', help='mini-batch size (default: 50)')
 parser.add_argument('--iter-size', default=5, type=int,
                     metavar='I', help='iter size as in Caffe to reduce memory usage (default: 5)')
 parser.add_argument('--new_length', default=1, type=int,
                     metavar='N', help='length of sampled video frames (default: 1)')
-parser.add_argument('--new_width', default=340, type=int,
-                    metavar='N', help='resize width (default: 340)')
-parser.add_argument('--new_height', default=299, type=int,
-                    metavar='N', help='resize height (default: 256)')
+parser.add_argument('--new_width', default=360, type=int,
+                    metavar='N', help='resize width (default: 320,360)')
+parser.add_argument('--new_height', default=320, type=int,
+                    metavar='N', help='resize height (default: 240,320)')
 parser.add_argument('--lr', '--learning-rate', default=0.001, type=float,
                     metavar='LR', help='initial learning rate')
 parser.add_argument('--lr_steps', default=[100, 200], type=float, nargs="+",
@@ -68,6 +69,8 @@ parser.add_argument('-pf','--print-freq', default=50,  type=int,
                     metavar='N', help='print frequency (default: 50)')
 parser.add_argument('-sf','--save-freq', default=25, type=int,
                     metavar='N', help='save frequency (default: 25)')
+parser.add_argument('--vr_approach', '-vra', default=3, type=int,
+                    metavar='N', help='visual rhythm approach (default: 3)')
 parser.add_argument('--resume', default='./checkpoints', type=str, metavar='PATH',
                     help='path to latest checkpoint (default: none)')
 parser.add_argument('-e', '--evaluate', dest='evaluate', action='store_true',
@@ -77,14 +80,14 @@ best_prec1 = 0
 os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"   
 os.environ["CUDA_VISIBLE_DEVICES"]="0"
 
-def createNewDataset(fileNameRead, fileNameWrite):
+def createNewDataset(fileNameRead, fileNameWrite, modality_):
     '''
-        Generate new train file to train the network with two RGB images,
+        Generate new training file to train the network with two RGB images,
         taking the first and second images randomly in the first and second 
         half respectively
     '''
     newPathFile = os.path.join(args.settings, args.dataset, fileNameWrite)
-    train_setting_file = fileNameRead % (args.modality, args.split)
+    train_setting_file = fileNameRead % (modality_, args.split)
     pathFile = os.path.join(args.settings, args.dataset, train_setting_file)    
 
     file_ = open(pathFile,'r')
@@ -92,8 +95,8 @@ def createNewDataset(fileNameRead, fileNameWrite):
     detallLines = list()
     for line in linesFile:
         lineInfo = line.split(' ')
-        first_frame = random.randint(0, int(lineInfor[1])//2-4)
-        second_frame = int(lineInfor[1])//2 + random.randint(0, int(lineInfor[1])//2-4)
+        first_frame = random.randint(1, int(lineInfo[1])//2-4)
+        second_frame = int(lineInfo[1])//2 + random.randint(1, int(lineInfo[1])//2-4)
         detallLines.append('{} {} {}'.format(lineInfo[0], first_frame, lineInfo[2]))
         detallLines.append('{} {} {}'.format(lineInfo[0], second_frame, lineInfo[2]))
     open(newPathFile,'w').writelines(detallLines)
@@ -127,12 +130,12 @@ def main():
     cudnn.benchmark = True
 
     # Data transforming
-    if args.modality == "rgb" or args.modality == "rhythm" or args.modality == "history":
+    if args.modality == "rgb" or args.modality == "rgb2":
         is_color = True
         scale_ratios = [1.0, 0.875, 0.75, 0.66]
         clip_mean = [0.485, 0.456, 0.406] * args.new_length
-        clip_std = [0.299, 0.224, 0.225] * args.new_length
-    elif args.modality == "flow":
+        clip_std = [0.229, 0.224, 0.225] * args.new_length
+    elif args.modality == "flow"  or args.modality == "rhythm":
         is_color = False
         scale_ratios = [1.0, 0.875, 0.75]
         clip_mean = [0.5, 0.5] * args.new_length
@@ -140,7 +143,7 @@ def main():
     else:
         print("No such modality. Only rgb and flow supported.")
 
-    new_size= 299 if args.arch =='rgb_inception_v3' else 224
+    new_size= 299 if args.arch.find("inception_v3")>0 else 224
 
     normalize = video_transforms.Normalize(mean=clip_mean,
                                            std=clip_std)
@@ -159,17 +162,16 @@ def main():
             normalize,
         ])
     
-    #createNewDataset("train_%s_split%d.txt" , "new_train.txt")
-    #createNewDataset("val_%s_split%d.txt", "new_test.txt")
-    
-    # data loading
-    #train_setting_file = 'new_train.txt'
-    modality_ = "rgb" if (args.modality == "rhythm" or args.modality == "history") else args.modality    
-    train_setting_file = "train_%s_split%d.txt" % (modality_, args.split)
+    modality_ = "rgb" if (args.modality == "rhythm" or args.modality[:3] == "rgb") else "flow" 
+    createNewDataset("train_%s_split%d.txt" , "new_train.txt",modality_)
+    createNewDataset("val_%s_split%d.txt", "new_test.txt",modality_)
+
+    # data loading  
+    train_setting_file = "new_train.txt" if args.modality == "rgb2" else "train_%s_split%d.txt" % (modality_, args.split)
     train_split_file = os.path.join(args.settings, args.dataset, train_setting_file)
-    #val_setting_file = 'new_test.txt'
-    val_setting_file = "val_%s_split%d.txt" % (modality_, args.split)
+    val_setting_file = "val_%s_split%d.txt" % (modality_, args.split) 
     val_split_file = os.path.join(args.settings, args.dataset, val_setting_file)
+
     if not os.path.exists(train_split_file) or not os.path.exists(val_split_file):
         print("No split file exists in %s directory. Preprocess the dataset first" % (args.settings))
 
@@ -181,7 +183,8 @@ def main():
                                                     new_length=args.new_length,
                                                     new_width=args.new_width,
                                                     new_height=args.new_height,
-                                                    video_transform=train_transform)
+                                                    video_transform=train_transform,
+                                                    approach_VR = args.vr_approach)
     val_dataset = datasets.__dict__['dataset'](root=args.data,
                                                   source=val_split_file,
                                                   phase="val",
@@ -190,7 +193,8 @@ def main():
                                                   new_length=args.new_length,
                                                   new_width=args.new_width,
                                                   new_height=args.new_height,
-                                                  video_transform=val_transform)
+                                                  video_transform=val_transform,
+                                                  approach_VR = args.vr_approach)
 
     print('{} samples found, {} train samples and {} test samples.'.format(len(val_dataset)+len(train_dataset),
                                                                            len(train_dataset),
@@ -237,8 +241,8 @@ def build_model(resume_epoch):
     is_new = (resume_epoch==0)
     found = True
     num_classes = 51 if args.dataset =='hmdb51' else 101
-    print("====================")
-    model = models.__dict__[args.arch](pretrained=is_new, num_classes=num_classes)
+    num_channels = 1 if args.modality == 'rhythm' else 20 if args.modality=='flow' else 3
+    model = models.__dict__[args.arch](pretrained=is_new, channels=num_channels, num_classes=num_classes)
     if not is_new:
         path = os.path.join(model_path,'{0:03d}_checkpoint.pth.tar'.format(resume_epoch))
         if os.path.isfile(path):    
@@ -271,14 +275,20 @@ def train(train_loader, model, criterion, optimizer, epoch):
         target = target.cuda(async=True)
         input_var = torch.autograd.Variable(input)
         target_var = torch.autograd.Variable(target)
-        if args.arch =='rgb_inception_v3':
-            output, __= model(input_var)
-        else:   
-            output= model(input_var)
+        outputs= model(input_var)
+
+        loss = None
+        # for nets that have multiple outputs such as inception
+        if isinstance(outputs, tuple):
+            loss = sum((criterion(o,target_var) for o in outputs))
+            outputs_data = outputs[0].data
+        else:
+            loss = criterion(outputs, target_var)
+            outputs_data = outputs.data    
+
         # measure accuracy and record loss
-        prec1, prec3 = accuracy(output.data, target, topk=(1, 3))
+        prec1, prec3 = accuracy(outputs_data, target, topk=(1, 3))
         acc_mini_batch += prec1[0]
-        loss = criterion(output, target_var)
         loss = loss / args.iter_size
         loss_mini_batch += loss.data[0]
         loss.backward()

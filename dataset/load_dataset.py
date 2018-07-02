@@ -5,7 +5,7 @@ import sys
 import random
 import numpy as np
 import cv2
-
+from pipes import quote
 
 def find_classes(dir):
     classes = [d for d in os.listdir(dir) if os.path.isdir(os.path.join(dir, d))]
@@ -41,11 +41,8 @@ def color(is_color):
     else:
         cv_read_flag = cv2.IMREAD_GRAYSCALE     # = 0    
     return cv_read_flag
-
-def build_clip_with_multiple_images():
-    print('a')
     
-def read_single_segment(path, offsets, new_height, new_width, new_length, is_color, name_pattern, index):
+def read_single_segment(path, offsets, new_height, new_width, new_length, is_color, name_pattern, modality, index):
     '''
         Takes visual_rhythm, history_motion or RGB images, one frame by video,
         and this correspond to some specific images(type of visual_rhythm or
@@ -54,7 +51,6 @@ def read_single_segment(path, offsets, new_height, new_width, new_length, is_col
     cv_read_flag = color(is_color)
     interpolation = cv2.INTER_LINEAR    
     sampled_list = []
-
     frame_name = name_pattern % (index)
     frame_path = os.path.join(path, frame_name)
     cv_img_origin = cv2.imread(frame_path, cv_read_flag)
@@ -67,8 +63,12 @@ def read_single_segment(path, offsets, new_height, new_width, new_length, is_col
         cv_img = cv2.resize(cv_img_origin, (new_width, new_height), interpolation)
     else:
         cv_img = cv_img_origin
-    cv_img = cv2.cvtColor(cv_img, cv2.COLOR_BGR2RGB)
-    sampled_list.append(cv_img)
+
+    if modality == "rgb":
+        cv_img = cv2.cvtColor(cv_img, cv2.COLOR_BGR2RGB)
+        sampled_list.append(cv_img)
+    else:    
+        sampled_list.append(np.expand_dims(cv_img, 2))
 
     clip_input = np.concatenate(sampled_list, axis=2)
     return clip_input 
@@ -122,7 +122,8 @@ class dataset(data.Dataset):
                  new_height=0,
                  transform=None,
                  target_transform=None,
-                 video_transform=None):
+                 video_transform=None,
+                 approach_VR = 3):
         classes, class_to_idx = find_classes(root) 
         clips = make_dataset(root, source)
         
@@ -134,11 +135,13 @@ class dataset(data.Dataset):
         self.source = source
         self.phase = phase
         self.modality = modality
+        self.dataset = source.split('/')[3]
+        self.visual_rhythm_approach = approach_VR
 
         self.classes = classes
         self.class_to_idx = class_to_idx
         self.clips = clips
-
+        self.direction =[]
         if name_pattern:
             self.name_pattern = name_pattern
         else:
@@ -146,6 +149,8 @@ class dataset(data.Dataset):
                 self.name_pattern = 'img_%05d.jpg'
             elif self.modality == 'rhythm':
                 self.name_pattern = 'visual_rhythm_%05d.jpg'
+                # recover the direction by class
+                self.direction = [int(line.rstrip('\n')) for line in open('./datasets/settings/'+self.dataset+'/direction.txt')]
             elif self.modality == 'flow':
                 self.name_pattern = 'flow_%s_%05d.jpg'
             elif self.modality == 'hog':
@@ -167,6 +172,7 @@ class dataset(data.Dataset):
         path, duration, target = self.clips[index]
         average_duration = int(duration / self.num_segments)
         offsets = []
+
         for seg_id in range(self.num_segments):
             if self.phase == 'train':
                 if average_duration >= self.new_length:
@@ -191,9 +197,11 @@ class dataset(data.Dataset):
                                         self.new_length,
                                         self.is_color,
                                         self.name_pattern,
-                                        1 + offsets[0] # duration 
+                                        self.modality,
+                                        1 + offsets[0]  #duration if self.phase == 'train' else  1 + offsets[0] 
                                         )
         elif self.modality == 'rhythm' or self.modality == 'history':
+            print(self.visual_rhythm_approach)
             clip_input = read_single_segment(path,
                                         offsets,
                                         self.new_height,
@@ -201,7 +209,8 @@ class dataset(data.Dataset):
                                         self.new_length,
                                         self.is_color,
                                         self.name_pattern,
-                                        2 # this number correspond to the type of visual rhythm image
+                                        self.modality,
+                                        self.direction[target] if self.visual_rhythm_approach==3 else self.visual_rhythm_approach #type of visual rhythm image
                                         )            
         elif self.modality == 'flow' or self.modality == 'hog':
             clip_input = read_multiple_segment(path,

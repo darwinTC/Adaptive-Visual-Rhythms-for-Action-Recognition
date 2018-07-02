@@ -2,18 +2,43 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.utils.model_zoo as model_zoo
+import collections
 
-
-__all__ = ['rgb_Inception3', 'rgb_inception_v3']
+__all__ = ['flow_Inception3', 'flow_inception_v3']
 
 
 model_urls = {
     # Inception v3 ported from TensorFlow
     'inception_v3_google': 'https://download.pytorch.org/models/inception_v3_google-1a9a5a14.pth',
 }
+def change_key_names(old_params, in_channels):
+    new_params = collections.OrderedDict()
+    layer_count = 0
+    allKeyList = old_params.keys()
+    for layer_key in allKeyList:
+        if layer_count >= len(allKeyList)-2:
+            # exclude fc layers
+            continue
+        else:
+            if layer_count == 0:
+                rgb_weight = old_params[layer_key]
+                # print(type(rgb_weight))
+                rgb_weight_mean = torch.mean(rgb_weight, dim=1)
+                # TODO: ugly fix here, why torch.mean() turn tensor to Variable
+                # print(type(rgb_weight_mean))
+                flow_weight = rgb_weight_mean.unsqueeze(1).repeat(1,in_channels,1,1)
+                new_params[layer_key] = flow_weight
+                layer_count += 1
+                # print(layer_key, new_params[layer_key].size(), type(new_params[layer_key]))
+            else:
+                new_params[layer_key] = old_params[layer_key]
+                layer_count += 1
+                # print(layer_key, new_params[layer_key].size(), type(new_params[layer_key]))
+    
+    return new_params
 
 
-def rgb_inception_v3(pretrained=False, **kwargs):
+def flow_inception_v3(pretrained=False, **kwargs):
     """Inception v3 model architecture from
     `"Rethinking the Inception Architecture for Computer Vision" <http://arxiv.org/abs/1512.00567>`_.
     Args:
@@ -22,26 +47,28 @@ def rgb_inception_v3(pretrained=False, **kwargs):
     if pretrained:
         if 'transform_input' not in kwargs:
             kwargs['transform_input'] = True
-        model = rgb_Inception3(**kwargs)
+        in_channels = int(kwargs['channels']) # flow = 20, VR = 1
+        model = flow_Inception3(**kwargs)
         #model.load_state_dict(model_zoo.load_url(model_urls['inception_v3_google']))
         pretrained_dict = model_zoo.load_url(model_urls['inception_v3_google'])
         model_dict = model.state_dict()
 
+        new_pretrained_dict = change_key_names(pretrained_dict, in_channels)
         # 1. filter out unnecessary keys
-        pretrained_dict = {k: v for k, v in pretrained_dict.items() if k in model_dict}
+        new_pretrained_dict = {k: v for k, v in new_pretrained_dict.items() if k in model_dict}
         # 2. overwrite entries in the existing state dict
-        model_dict.update(pretrained_dict) 
+        model_dict.update(new_pretrained_dict) 
         # 3. load the new state dict
         model.load_state_dict(model_dict)        
         return model
 
-    return rgb_Inception3(**kwargs)
+    return flow_Inception3(**kwargs)
 
 
-class rgb_Inception3(nn.Module):
+class flow_Inception3(nn.Module):
 
-    def __init__(self, channels = 3, num_classes=1000, aux_logits=True, transform_input=False):
-        super(rgb_Inception3, self).__init__()
+    def __init__(self, channels = 20, num_classes=1000, aux_logits=True, transform_input=False):
+        super(flow_Inception3, self).__init__()
         self.aux_logits = aux_logits
         self.transform_input = transform_input
         self.Conv2d_1a_3x3 = BasicConv2d(channels, 32, kernel_size=3, stride=2)
@@ -63,7 +90,6 @@ class rgb_Inception3(nn.Module):
         self.Mixed_7b = InceptionE(1280)
         self.Mixed_7c = InceptionE(2048)
         self.fc_action = nn.Linear(2048, num_classes)
-
         for m in self.modules():
             if isinstance(m, nn.Conv2d) or isinstance(m, nn.Linear):
                 import scipy.stats as stats
@@ -73,16 +99,15 @@ class rgb_Inception3(nn.Module):
                 values = values.view(m.weight.size())
                 m.weight.data.copy_(values)
             elif isinstance(m, nn.BatchNorm2d):
-                nn.init.constant_(m.weight, 1)
-                nn.init.constant_(m.bias, 0)
+                m.weight.data.fill_(1)
+                m.bias.data.zero_()
 
     def forward(self, x):
         '''
         if self.transform_input:
             x = x.clone()
-            x[:, 0] = x[:, 0] * (0.229 / 0.5) + (0.485 - 0.5) / 0.5
-            x[:, 1] = x[:, 1] * (0.224 / 0.5) + (0.456 - 0.5) / 0.5
-            x[:, 2] = x[:, 2] * (0.225 / 0.5) + (0.406 - 0.5) / 0.5
+            for i in range(0,1):
+                x[:, i] = x[:, i] * (0.226 / 0.5) + (0.5 - 0.5) / 0.5
         '''
         # 299 x 299 x 3
         x = self.Conv2d_1a_3x3(x)

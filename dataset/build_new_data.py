@@ -14,7 +14,6 @@ from multiprocessing import Pool, current_process
 from skimage.feature import hog
 from skimage import data, color, exposure
 
-
 def complete_frames(frames, height = 240, width = 320):
     '''
         Increase the number of frames to be able to obtain the desired
@@ -317,7 +316,9 @@ def obtain_previous_optical_flow_images(out_full_path):
         and stored in the folde 'nameDS'_frame, where nameDS is the
         name of the dataset.
     '''
-    path_images = [elem.split('/')[-1] for elem in glob.glob(os.path.join(out_full_path, '*'))]
+    out_full_path_ = glob.escape(out_full_path)
+    path_images = [elem.split('/')[-1] for elem in glob.glob(os.path.join(out_full_path_, '*'))]
+
     flow_x = sorted([os.path.join(out_full_path,elem) for elem in path_images if elem[:6]=='flow_x'])
     flow_y = sorted([os.path.join(out_full_path,elem) for elem in path_images if elem[:6]=='flow_y'])
 
@@ -351,7 +352,7 @@ def create_HOG_from_optical_flow(out_full_path, vid_name):
     '''
     flow_x, flow_y = obtain_previous_optical_flow_images(out_full_path)  
 
-    print('creating images to video: '+vid_name)
+    print(flag, 'creating images to video: '+vid_name)
     for i in range(len(flow_x)):
         __, img_x = hog(flow_x[i], orientations=8, pixels_per_cell=(8, 8),
                                 cells_per_block=(1, 1), visualise=True)
@@ -434,6 +435,7 @@ def create_train_test_files(path):
         new_test.close()
 
 if __name__ == '__main__':
+
     parser = argparse.ArgumentParser(description='extract visual rhythm ')
     parser.add_argument('--src_dir', type=str, default='./UCF-101',
                         help='path to the video data')
