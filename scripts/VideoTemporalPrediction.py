@@ -32,7 +32,8 @@ def VideoTemporalPrediction(
         start_frame=0,
         num_frames=0,
         num_samples=25,
-        optical_flow_frames=10
+        optical_flow_frames=10,
+        new_size = 299
         ):
 
     if num_frames == 0:
@@ -54,8 +55,8 @@ def VideoTemporalPrediction(
     # selection
     step = int(math.floor((duration-optical_flow_frames+1)/num_samples))
     # inception = 320,360, resnet = 240, 320
-    width = 320
-    height = 360
+    width = 320 if new_size==299 else 240
+    height = 360 if new_size==299 else 320
     dims = (width,height,optical_flow_frames*2,num_samples)
     flow = np.zeros(shape=dims, dtype=np.float64)
     flow_flip = np.zeros(shape=dims, dtype=np.float64)
@@ -76,7 +77,7 @@ def VideoTemporalPrediction(
             flow_flip[:,:,j*2+1,i] = img_y[:, ::-1]
 
     # crop 299 = inception, 224 = resnet
-    size = 299
+    size = new_size
     corner = [(height-size)//2, (width-size)//2]
     flow_1 = flow[:size, :size, :,:]
     flow_2 = flow[:size, -size:, :,:]

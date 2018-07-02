@@ -51,10 +51,11 @@ def main():
     data_path = '../../datasets/'+args.dataset+'_frames'
     start_frame = 0
     num_categories = 51 if args.dataset=='hmdb51' else 101
-
+    new_size= 224
     model_start_time = time.time()
     params = torch.load(model_path)
     if args.architecture == "inception_v3":
+        new_size=299
         temporal_net = models.flow_inception_v3(pretrained=False, channels = 20, num_classes=num_categories)
     else:
         temporal_net = models.flow_resnet152(pretrained=False, channels = 20, num_classes=num_categories)   
@@ -85,7 +86,8 @@ def main():
                 temporal_net,
                 num_categories,
                 start_frame,
-                num_frames)
+                num_frames,
+                new_size)
 
         avg_spatial_pred_fc8 = np.mean(spatial_prediction, axis=1)
         # print(avg_spatial_pred_fc8.shape)
