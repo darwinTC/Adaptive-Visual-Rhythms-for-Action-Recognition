@@ -22,14 +22,13 @@ def complete_frames(frames, height = 240, width = 320):
     missing_frames = 0
     number_frames = len(frames)
     # complete the number of frame missing   
-    if width > len(frames):
-        missing_frames = width - number_frames;
+    if width > number_frames:
+        missing_frames = width - number_frames
     iterator = missing_frames // number_frames
-    aditional = missing_frames % number_frames if missing_frames % number_frames != 0 else 0
+    aditional = missing_frames % number_frames
         
     new_frames = []
     for frame in frames:
-        new_frames.append(frame)
         for i in range(0,iterator):
             new_frames.append(frame)
         if aditional !=0:
@@ -352,7 +351,7 @@ def create_HOG_from_optical_flow(out_full_path, vid_name):
     '''
     flow_x, flow_y = obtain_previous_optical_flow_images(out_full_path)  
 
-    print(flag, 'creating images to video: '+vid_name)
+    print('Creating images to video: '+vid_name)
     for i in range(len(flow_x)):
         __, img_x = hog(flow_x[i], orientations=8, pixels_per_cell=(8, 8),
                                 cells_per_block=(1, 1), visualise=True)
@@ -376,7 +375,7 @@ def run_create_images(vid_item):
     vid_path = vid_item[0]
     vid_id = vid_item[1]
     vid_name = vid_path.split('/')[-1].split('.')[0]
-    out_full_path = os.path.join(out_path, vid_name)
+    out_full_path = os.path.join(out_path, vid_name)  
     try:
         os.mkdir(out_full_path)
     except OSError:
@@ -403,7 +402,7 @@ def run_create_images(vid_item):
         create_images_hog(frames, hog_path, vid_name)
     elif modality == 'rhythm-OF':
         create_visual_rhythm_from_optical_flow(visual_rhythm_path, out_full_path, vid_name)
-    elif modality == 'HOF-OF':
+    elif modality == 'HOG-OF':
         create_HOG_from_optical_flow(out_full_path, vid_name)
     return True;
 
@@ -446,12 +445,10 @@ if __name__ == '__main__':
 
     parser.add_argument('--num_worker', type=int, default=8)
     parser.add_argument('--num_gpu', type=int, default=2, help='number of GPU')
-    parser.add_argument('--out_format', type=str, default='dir', choices=['dir','zip'],
-                        help='path to the visual rhythm')
     parser.add_argument('--ext', type=str, default='avi', choices=['avi','mp4'],
                         help='video file extensions')
     parser.add_argument('--modality', '-m', metavar='MODALITY', default='rhythm-H',
-                        choices=['rhythm-H', 'rhythm-V', 'rhythm-HV', 'rhythm-DTD', 'rhythm-OF', 'rhythm-DDT', 'gradients','hog', 'HOF-OF'],
+                        choices=['rhythm-H', 'rhythm-V', 'rhythm-HV', 'rhythm-DTD', 'rhythm-OF', 'rhythm-DDT', 'gradients','hog', 'HOG-OF'],
                         help='modality: rhythm-H | rhythm-V | rhythm-HV | rhythm-DTD | rhythm-OF | rhythm-DDT | gradients | hog | HOF-OF')
     parser.add_argument('--type_gradient', '-tg', metavar='GRADIENT', default='gradient_x',
                         choices=['gradient_x', 'gradient_y'],
@@ -461,7 +458,6 @@ if __name__ == '__main__':
     out_path = args.out_dir
     src_path = args.src_dir
     num_worker = args.num_worker
-    out_format = args.out_format
     ext = args.ext
     modality = args.modality
     new_size = (args.new_width, args.new_height)
