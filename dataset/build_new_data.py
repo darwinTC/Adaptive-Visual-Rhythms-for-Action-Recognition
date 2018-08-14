@@ -29,7 +29,7 @@ def complete_frames(frames, height = 240, width = 320):
         
     new_frames = []
     for frame in frames:
-        for i in range(0,iterator):
+        for i in range(0,iterator+1):
             new_frames.append(frame)
         if aditional !=0:
             new_frames.append(frame)
