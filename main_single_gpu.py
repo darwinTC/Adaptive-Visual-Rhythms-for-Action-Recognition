@@ -162,9 +162,11 @@ def main():
             normalize,
         ])
     
-    modality_ = "rgb" if (args.modality == "rhythm" or args.modality[:3] == "rgb") else "flow" 
-    createNewDataset("train_%s_split%d.txt" , "new_train.txt",modality_)
-    createNewDataset("val_%s_split%d.txt", "new_test.txt",modality_)
+    modality_ = "rgb" if (args.modality == "rhythm" or args.modality[:3] == "rgb") else "flow"
+ 
+	if args.modality == "rgb2":
+		createNewDataset("train_%s_split%d.txt" , "new_train.txt",modality_)
+		createNewDataset("val_%s_split%d.txt", "new_test.txt",modality_)
 
     # data loading  
     train_setting_file = "new_train.txt" if args.modality == "rgb2" else "train_%s_split%d.txt" % (modality_, args.split)
