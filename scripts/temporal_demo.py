@@ -87,7 +87,7 @@ def main():
                 num_categories,
                 start_frame,
                 num_frames,
-                new_size)
+                new_size=new_size)
 
         avg_spatial_pred_fc8 = np.mean(spatial_prediction, axis=1)
         # print(avg_spatial_pred_fc8.shape)
